@@ -47,12 +47,12 @@ public class MarketService {
             log.debug("Fetching global market summary");
             CoinGeckoGlobalResponse response = coinGeckoClient.fetchGlobal();
 
-            if (response == null || response.getData() == null) {
+            if (response == null || response.getGlobalData() == null) {
                 log.warn("Empty response from global endpoint");
                 return GlobalMarketDTO.builder().build();
             }
 
-            CoinGeckoGlobalResponse.Data data = response.getData();
+            CoinGeckoGlobalResponse.GlobalData data = response.getGlobalData();
             return GlobalMarketDTO.builder()
                     .totalMarketCapUsd(data.getTotalMarketCap() != null ? data.getTotalMarketCap().getUsd() : null)
                     .totalMarketCapInr(data.getTotalMarketCap() != null ? data.getTotalMarketCap().getInr() : null)

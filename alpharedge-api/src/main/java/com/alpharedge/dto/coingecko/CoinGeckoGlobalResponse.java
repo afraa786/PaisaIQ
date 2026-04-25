@@ -14,13 +14,13 @@ import java.math.BigDecimal;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CoinGeckoGlobalResponse {
     @JsonProperty("data")
-    private Data globalData;
+    private GlobalData globalData;
 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class Data {
+    public static class GlobalData {
         @JsonProperty("total_market_cap")
         private MarketCap totalMarketCap;
 
