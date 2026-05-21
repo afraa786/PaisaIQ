@@ -77,3 +77,8 @@ npm-debug.log
 .gradle
 .recommenders
 *.bak
+
+
+application.properties
+application-prod.properties
+application-dev.properties
