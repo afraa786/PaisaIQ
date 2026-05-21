@@ -47,14 +47,6 @@
             <artifactId>spring-boot-starter-data-mongodb</artifactId>
         </dependency>
 
-        <!-- Embedded MongoDB for Development -->
-        <dependency>
-            <groupId>de.flapdoodle.embed</groupId>
-            <artifactId>de.flapdoodle.embed.mongo</artifactId>
-            <version>4.11.0</version>
-            <scope>test</scope>
-        </dependency>
-
         <!-- Spring Mail -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -27,11 +27,17 @@ dependency-reduced-pom.xml
 build/
 *.gradle
 
-# Spring Boot
-spring-boot-crud-application.log
-application-local.properties
+# Environment variables - NEVER commit these
 .env
 .env.local
+.env.production
+
+# MongoDB credentials
+application-prod.properties
+application-local.properties
+
+# Spring Boot
+spring-boot-crud-application.log
 
 # Database
 *.db
