@@ -1,11 +1,13 @@
 package com.alpharedge.service;
 
 import com.alpharedge.client.CoinGeckoClient;
+import com.alpharedge.client.ExchangeRateClient;
 import com.alpharedge.document.CoinSignal;
 import com.alpharedge.document.PriceSnapshot;
 import com.alpharedge.document.TrackedCoin;
 import com.alpharedge.dto.coingecko.CoinGeckoDetailResponse;
 import com.alpharedge.dto.response.CoinDetailDTO;
+import com.alpharedge.dto.response.CoinPriceDTO;
 import com.alpharedge.dto.response.CoinSignalDTO;
 import com.alpharedge.dto.response.CompareDTO;
 import com.alpharedge.dto.response.PriceSnapshotDTO;
@@ -18,6 +20,7 @@ import com.alpharedge.repository.PriceSnapshotRepository;
 import com.alpharedge.repository.TrackedCoinRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -32,6 +35,7 @@ import java.util.stream.Collectors;
 public class CoinService {
 
     private final CoinGeckoClient coinGeckoClient;
+    private final ExchangeRateClient exchangeRateClient;
     private final TrackedCoinRepository trackedCoinRepository;
     private final PriceSnapshotRepository priceSnapshotRepository;
     private final CoinSignalRepository coinSignalRepository;
@@ -40,12 +44,14 @@ public class CoinService {
 
     @Autowired
     public CoinService(CoinGeckoClient coinGeckoClient,
+                      ExchangeRateClient exchangeRateClient,
                       TrackedCoinRepository trackedCoinRepository,
                       PriceSnapshotRepository priceSnapshotRepository,
                       CoinSignalRepository coinSignalRepository,
                       CoinMapper coinMapper,
                       TechnicalAnalysisService technicalAnalysisService) {
         this.coinGeckoClient = coinGeckoClient;
+        this.exchangeRateClient = exchangeRateClient;
         this.trackedCoinRepository = trackedCoinRepository;
         this.priceSnapshotRepository = priceSnapshotRepository;
         this.coinSignalRepository = coinSignalRepository;
@@ -85,22 +91,7 @@ public class CoinService {
                         details.getMarketData().getCurrentPrice().getUsd()
                 );
 
-                CoinSignal signal = CoinSignal.builder()
-                        .coinId(coinId)
-                        .rsi(signalResult.getRsi())
-                        .macd(signalResult.getMacd())
-                        .macdSignal(signalResult.getMacdSignal())
-                        .macdHistogram(signalResult.getMacdHistogram())
-                        .sma7(signalResult.getSma7())
-                        .sma30(signalResult.getSma30())
-                        .bollingerUpper(signalResult.getBollingerUpper())
-                        .bollingerMiddle(signalResult.getBollingerMiddle())
-                        .bollingerLower(signalResult.getBollingerLower())
-                        .signal(CoinSignal.Signal.valueOf(signalResult.getSignal()))
-                        .strength(CoinSignal.SignalStrength.valueOf(signalResult.getStrength()))
-                        .volatilityScore(signalResult.getVolatilityScore())
-                        .momentumScore(signalResult.getMomentumScore())
-                        .build();
+                CoinSignal signal = buildCoinSignal(coinId, signalResult);
                 coinSignalRepository.save(signal);
             }
 
@@ -170,6 +161,7 @@ public class CoinService {
         }
     }
 
+    @Cacheable(value = "coinSignals", key = "#coinId")
     public CoinSignalDTO getCoinSignal(String coinId) {
         try {
             CoinSignal signal = coinSignalRepository.findTopByCoinIdOrderByComputedAtDesc(coinId)
@@ -178,6 +170,29 @@ public class CoinService {
             return coinMapper.toDTO(signal);
         } catch (Exception ex) {
             log.error("Error fetching coin signal: {}", coinId, ex);
+            throw ex;
+        }
+    }
+
+    @Cacheable(value = "coinPrices", key = "#coinId")
+    public CoinPriceDTO getCoinPrice(String coinId) {
+        try {
+            trackedCoinRepository.findByCoinId(coinId)
+                    .orElseThrow(() -> new CoinNotFoundException("Coin not found: " + coinId));
+
+            CoinGeckoDetailResponse details = coinGeckoClient.fetchCoinDetails(coinId);
+            BigDecimal priceUsd = details.getMarketData().getCurrentPrice().getUsd();
+            BigDecimal usdToInr = exchangeRateClient.fetchUsdToInrRate();
+            BigDecimal priceInr = priceUsd.multiply(usdToInr);
+
+            return CoinPriceDTO.builder()
+                    .coinId(coinId)
+                    .priceUSD(priceUsd)
+                    .priceINR(priceInr)
+                    .lastUpdated(java.time.LocalDateTime.now())
+                    .build();
+        } catch (Exception ex) {
+            log.error("Error fetching coin price: {}", coinId, ex);
             throw ex;
         }
     }
@@ -274,22 +289,7 @@ public class CoinService {
                                 snapshot.getPriceUsd()
                         );
 
-                        CoinSignal signal = CoinSignal.builder()
-                                .coinId(coin.getCoinId())
-                                .rsi(signalResult.getRsi())
-                                .macd(signalResult.getMacd())
-                                .macdSignal(signalResult.getMacdSignal())
-                                .macdHistogram(signalResult.getMacdHistogram())
-                                .sma7(signalResult.getSma7())
-                                .sma30(signalResult.getSma30())
-                                .bollingerUpper(signalResult.getBollingerUpper())
-                                .bollingerMiddle(signalResult.getBollingerMiddle())
-                                .bollingerLower(signalResult.getBollingerLower())
-                                .signal(CoinSignal.Signal.valueOf(signalResult.getSignal()))
-                                .strength(CoinSignal.SignalStrength.valueOf(signalResult.getStrength()))
-                                .volatilityScore(signalResult.getVolatilityScore())
-                                .momentumScore(signalResult.getMomentumScore())
-                                .build();
+                        CoinSignal signal = buildCoinSignal(coin.getCoinId(), signalResult);
                         coinSignalRepository.save(signal);
                     }
                 } catch (Exception ex) {
@@ -302,12 +302,36 @@ public class CoinService {
         }
     }
 
+    private CoinSignal buildCoinSignal(String coinId, TechnicalAnalysisService.CoinSignalResult r) {
+        return CoinSignal.builder()
+                .coinId(coinId)
+                .rsi(r.getRsi())
+                .macd(r.getMacd())
+                .macdSignal(r.getMacdSignal())
+                .macdHistogram(r.getMacdHistogram())
+                .sma7(r.getSma7())
+                .sma30(r.getSma30())
+                .bollingerUpper(r.getBollingerUpper())
+                .bollingerMiddle(r.getBollingerMiddle())
+                .bollingerLower(r.getBollingerLower())
+                .signal(CoinSignal.Signal.valueOf(r.getSignal()))
+                .strength(CoinSignal.SignalStrength.valueOf(r.getStrength()))
+                .volatilityScore(r.getVolatilityScore())
+                .momentumScore(r.getMomentumScore())
+                .signalExplanation(r.getSignalExplanation())
+                .riskScore(r.getRiskScore())
+                .build();
+    }
+
     private PriceSnapshot mapDetailResponseToSnapshot(CoinGeckoDetailResponse details, String coinId) {
         CoinGeckoDetailResponse.MarketData market = details.getMarketData();
+        BigDecimal priceUsd = market.getCurrentPrice().getUsd();
+        BigDecimal usdToInr = exchangeRateClient.fetchUsdToInrRate();
+        BigDecimal priceInr = priceUsd.multiply(usdToInr);
         return PriceSnapshot.builder()
                 .coinId(coinId)
-                .priceUsd(market.getCurrentPrice().getUsd())
-                .priceInr(market.getCurrentPrice().getInr())
+                .priceUsd(priceUsd)
+                .priceInr(priceInr)
                 .marketCapUsd(market.getMarketCap().getUsd())
                 .volume24hUsd(market.getVol24h().getUsd())
                 .priceChange24hPercent(market.getPriceChange24h().getUsd())

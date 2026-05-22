@@ -12,6 +12,8 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface CoinMapper {
 
+    CoinMapper INSTANCE = org.mapstruct.factory.Mappers.getMapper(CoinMapper.class);
+
     TrackedCoinDTO toDTO(TrackedCoin trackedCoin);
 
     TrackedCoin toEntity(TrackedCoinDTO trackedCoinDTO);

@@ -8,6 +8,8 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface AlertMapper {
 
+    AlertMapper INSTANCE = org.mapstruct.factory.Mappers.getMapper(AlertMapper.class);
+
     AlertDTO toDTO(PriceAlert priceAlert);
 
     PriceAlert toEntity(AlertDTO alertDTO);

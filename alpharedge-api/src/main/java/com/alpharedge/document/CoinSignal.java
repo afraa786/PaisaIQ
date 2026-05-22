@@ -33,6 +33,8 @@ public class CoinSignal {
     private SignalStrength strength;
     private BigDecimal volatilityScore;
     private BigDecimal momentumScore;
+    private String signalExplanation;
+    private Integer riskScore;
 
     @Builder.Default
     private LocalDateTime computedAt = LocalDateTime.now();

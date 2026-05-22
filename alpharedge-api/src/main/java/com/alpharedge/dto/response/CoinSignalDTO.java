@@ -29,5 +29,7 @@ public class CoinSignalDTO {
     private CoinSignal.SignalStrength strength;
     private BigDecimal volatilityScore;
     private BigDecimal momentumScore;
+    private String signalExplanation;
+    private Integer riskScore;
     private LocalDateTime computedAt;
 }

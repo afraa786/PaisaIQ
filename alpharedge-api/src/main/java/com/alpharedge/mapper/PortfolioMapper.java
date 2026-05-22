@@ -5,9 +5,12 @@ import com.alpharedge.document.Portfolio;
 import com.alpharedge.dto.response.HoldingSummaryDTO;
 import com.alpharedge.dto.response.PortfolioDTO;
 import org.mapstruct.Mapper;
+import org.mapstruct.factory.Mappers;
 
 @Mapper(componentModel = "spring")
 public interface PortfolioMapper {
+
+    PortfolioMapper INSTANCE = Mappers.getMapper(PortfolioMapper.class);
 
     PortfolioDTO toDTO(Portfolio portfolio);
 

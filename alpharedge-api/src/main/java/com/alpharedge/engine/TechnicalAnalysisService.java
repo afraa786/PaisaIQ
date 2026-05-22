@@ -311,6 +311,98 @@ public class TechnicalAnalysisService {
         }
     }
 
+    public String generateExplanation(BigDecimal rsi, BigDecimal macd, BigDecimal macdSignal,
+                                      BigDecimal change7d, BigDecimal volatility,
+                                      String signal, String strength) {
+        try {
+            StringBuilder sb = new StringBuilder();
+
+            // Momentum sentence
+            if (change7d != null) {
+                double c7 = change7d.doubleValue();
+                if (c7 > 5) {
+                    sb.append(String.format("Strong buying momentum over 7 days (+%.1f%%). ", c7));
+                } else if (c7 > 0) {
+                    sb.append(String.format("Mild positive momentum over 7 days (+%.1f%%). ", c7));
+                } else if (c7 < -5) {
+                    sb.append(String.format("Strong selling pressure over 7 days (%.1f%%). ", c7));
+                } else {
+                    sb.append(String.format("Flat price action over 7 days (%.1f%%). ", c7));
+                }
+            }
+
+            // RSI sentence
+            if (rsi != null) {
+                double r = rsi.doubleValue();
+                if (r >= 70) {
+                    sb.append(String.format("RSI at %.0f is overbought — caution for new buys. ", r));
+                } else if (r <= 30) {
+                    sb.append(String.format("RSI at %.0f is oversold — potential reversal zone. ", r));
+                } else {
+                    sb.append(String.format("RSI at %.0f is neutral, not overbought. ", r));
+                }
+            }
+
+            // MACD sentence
+            if (macd != null && macdSignal != null) {
+                if (macd.compareTo(macdSignal) > 0) {
+                    sb.append("MACD is above signal line — bullish crossover active. ");
+                } else {
+                    sb.append("MACD is below signal line — bearish crossover active. ");
+                }
+            }
+
+            // Volatility sentence
+            if (volatility != null) {
+                double v = volatility.doubleValue();
+                if (v > 60) {
+                    sb.append("High volatility detected — position sizing recommended. ");
+                } else if (v > 30) {
+                    sb.append("Moderate volatility. ");
+                } else {
+                    sb.append("Low volatility environment. ");
+                }
+            }
+
+            // Overall verdict
+            sb.append(String.format("Overall signal: %s (%s).", signal, strength.toLowerCase()));
+
+            return sb.toString().trim();
+        } catch (Exception ex) {
+            log.error("Error generating explanation", ex);
+            return String.format("Overall signal: %s (%s).", signal, strength.toLowerCase());
+        }
+    }
+
+    public int computeRiskScore(BigDecimal volatility, BigDecimal currentPrice,
+                                BigDecimal bollingerUpper, BigDecimal bollingerMiddle) {
+        try {
+            double score = 1.0;
+
+            // Volatility contributes up to 6 points (0-100 maps to 0-6)
+            if (volatility != null) {
+                score += (volatility.doubleValue() / 100.0) * 6.0;
+            }
+
+            // Distance above Bollinger middle contributes up to 3 points
+            if (currentPrice != null && bollingerUpper != null && bollingerMiddle != null) {
+                double upper = bollingerUpper.doubleValue();
+                double middle = bollingerMiddle.doubleValue();
+                double current = currentPrice.doubleValue();
+                double band = upper - middle;
+                if (band > 0) {
+                    double distanceFraction = Math.max(0, (current - middle) / band);
+                    score += Math.min(distanceFraction, 1.0) * 3.0;
+                }
+            }
+
+            return Math.max(1, Math.min(10, (int) Math.round(score)));
+        } catch (Exception ex) {
+            log.error("Error computing risk score", ex);
+            return 5;
+        }
+    }
+
     public CoinSignalResult computeAll(List<BigDecimal> prices, BigDecimal change24h,
                                       BigDecimal change7d, BigDecimal change30d,
                                       BigDecimal currentPrice) {
@@ -332,6 +424,14 @@ public class TechnicalAnalysisService {
                     macd.getSignalLine()
             );
 
+            String explanation = generateExplanation(
+                    rsi, macd.getMacdLine(), macd.getSignalLine(),
+                    change7d, volatility, signal.getSignal(), signal.getStrength()
+            );
+
+            int riskScore = computeRiskScore(volatility, currentPrice,
+                    bollinger.getUpper(), bollinger.getMiddle());
+
             return CoinSignalResult.builder()
                     .rsi(rsi)
                     .macd(macd.getMacdLine())
@@ -346,6 +446,8 @@ public class TechnicalAnalysisService {
                     .strength(signal.getStrength())
                     .volatilityScore(volatility)
                     .momentumScore(momentum)
+                    .signalExplanation(explanation)
+                    .riskScore(riskScore)
                     .build();
         } catch (Exception ex) {
             log.error("Error computing all technical indicators", ex);
@@ -363,6 +465,8 @@ public class TechnicalAnalysisService {
                     .strength("WEAK")
                     .volatilityScore(BigDecimal.ZERO)
                     .momentumScore(BigDecimal.ZERO)
+                    .signalExplanation("Insufficient data to generate explanation.")
+                    .riskScore(5)
                     .build();
         }
     }
@@ -416,5 +520,7 @@ public class TechnicalAnalysisService {
         private String strength;
         private BigDecimal volatilityScore;
         private BigDecimal momentumScore;
+        private String signalExplanation;
+        private Integer riskScore;
     }
 }

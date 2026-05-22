@@ -1,6 +1,7 @@
 package com.alpharedge.controller;
 
 import com.alpharedge.dto.response.CoinDetailDTO;
+import com.alpharedge.dto.response.CoinPriceDTO;
 import com.alpharedge.dto.response.CoinSignalDTO;
 import com.alpharedge.dto.response.CompareDTO;
 import com.alpharedge.dto.response.PriceSnapshotDTO;
@@ -8,6 +9,10 @@ import com.alpharedge.dto.response.TrackedCoinDTO;
 import com.alpharedge.service.CoinService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,6 +79,11 @@ public class CoinController {
 
     @GetMapping("/{coinId}/signal")
     @Operation(summary = "Get technical analysis signal", description = "Get the latest technical analysis signal for a coin")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Signal returned",
+                    content = @Content(schema = @Schema(implementation = CoinSignalDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Coin not tracked", content = @Content)
+    })
     public ResponseEntity<CoinSignalDTO> getCoinSignal(
             @Parameter(description = "CoinGecko coin ID")
             @PathVariable String coinId) {
@@ -82,13 +92,42 @@ public class CoinController {
         return ResponseEntity.ok(signal);
     }
 
-    @GetMapping("/{coinId}/price")
-    @Operation(summary = "Get live price", description = "Get the latest live price data for a coin")
-    public ResponseEntity<PriceSnapshotDTO> getLivePrice(
-            @Parameter(description = "CoinGecko coin ID")
+    @GetMapping("/{coinId}/signal/explain")
+    @Operation(
+            summary = "Get signal with plain English explanation",
+            description = "Returns the latest technical analysis signal including a plain English explanation and risk score (1=very safe, 10=very risky). Cached for 1 hour."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Signal with explanation returned",
+                    content = @Content(schema = @Schema(implementation = CoinSignalDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Coin not tracked or no signal data", content = @Content)
+    })
+    public ResponseEntity<CoinSignalDTO> getCoinSignalExplain(
+            @Parameter(description = "CoinGecko coin ID (e.g. 'bitcoin')")
             @PathVariable String coinId) {
-        log.debug("Get live price request: {}", coinId);
-        PriceSnapshotDTO price = coinService.getLivePrice(coinId);
+        log.debug("Get signal explain request: {}", coinId);
+        CoinSignalDTO signal = coinService.getCoinSignal(coinId);
+        return ResponseEntity.ok(signal);
+    }
+
+    @GetMapping("/{coinId}/price")
+    @Operation(
+            summary = "Get coin price",
+            description = "Returns cached USD and INR price for a coin. INR computed via live USD/INR exchange rate. Cache TTL: 5 minutes."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Price data returned",
+                    content = @Content(schema = @Schema(implementation = CoinPriceDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Coin not tracked",
+                    content = @Content),
+            @ApiResponse(responseCode = "429", description = "CoinGecko rate limit exceeded",
+                    content = @Content)
+    })
+    public ResponseEntity<CoinPriceDTO> getCoinPrice(
+            @Parameter(description = "CoinGecko coin ID (e.g. 'bitcoin')")
+            @PathVariable String coinId) {
+        log.debug("Get coin price request: {}", coinId);
+        CoinPriceDTO price = coinService.getCoinPrice(coinId);
         return ResponseEntity.ok(price);
     }
 
