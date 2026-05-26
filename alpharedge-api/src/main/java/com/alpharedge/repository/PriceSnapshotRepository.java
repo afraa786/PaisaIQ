@@ -14,4 +14,7 @@ public interface PriceSnapshotRepository extends MongoRepository<PriceSnapshot, 
 
     List<PriceSnapshot> findByCoinIdAndFetchedAtAfterOrderByFetchedAtDesc(
             String coinId, LocalDateTime after);
+
+    Optional<PriceSnapshot> findTopByCoinIdAndFetchedAtBeforeOrderByFetchedAtDesc(
+            String coinId, LocalDateTime before);
 }

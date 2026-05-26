@@ -15,14 +15,27 @@ import java.util.List;
 public class PortfolioSummaryDTO {
     private String portfolioId;
     private String portfolioName;
-    private BigDecimal totalValue;
-    private BigDecimal totalCostBasis;
+
+    // USD totals
+    private BigDecimal totalValueUsd;
+    private BigDecimal totalCostBasisUsd;
     private BigDecimal totalPnlUsd;
     private BigDecimal totalPnlPercent;
+
+    // INR totals (for Flutter display)
+    private BigDecimal totalValueInr;
+    private BigDecimal totalCostBasisInr;
+    private BigDecimal totalPnlInr;
+
+    // 24h change
+    private BigDecimal dayChangeInr;
+    private BigDecimal dayChangePercent;
+
     private String bestPerformer;
     private BigDecimal bestPerformerGain;
     private String worstPerformer;
     private BigDecimal worstPerformerLoss;
+
     private List<HoldingPerformanceDTO> holdings;
 
     @Data
@@ -34,10 +47,22 @@ public class PortfolioSummaryDTO {
         private String coinId;
         private String symbol;
         private BigDecimal quantity;
-        private BigDecimal currentPrice;
-        private BigDecimal currentValue;
-        private BigDecimal costBasis;
+
+        // USD
+        private BigDecimal currentPriceUsd;
+        private BigDecimal currentValueUsd;
+        private BigDecimal costBasisUsd;
         private BigDecimal pnlUsd;
         private BigDecimal pnlPercent;
+
+        // INR
+        private BigDecimal currentPriceInr;
+        private BigDecimal currentValueInr;
+        private BigDecimal costBasisInr;
+        private BigDecimal pnlInr;
+
+        // 24h change
+        private BigDecimal dayChangeInr;
+        private BigDecimal dayChangePercent;
     }
 }

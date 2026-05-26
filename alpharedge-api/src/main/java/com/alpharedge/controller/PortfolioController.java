@@ -3,6 +3,7 @@ package com.alpharedge.controller;
 import com.alpharedge.dto.request.AddHoldingRequest;
 import com.alpharedge.dto.request.CreatePortfolioRequest;
 import com.alpharedge.dto.response.PortfolioDTO;
+import com.alpharedge.dto.response.PortfolioHistoryDTO;
 import com.alpharedge.dto.response.PortfolioSummaryDTO;
 import com.alpharedge.service.PortfolioService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -90,6 +91,20 @@ public class PortfolioController {
         log.debug("Get portfolio summary: {} for user: {}", id, userId);
         PortfolioSummaryDTO summary = portfolioService.getPortfolioSummary(id, userId);
         return ResponseEntity.ok(summary);
+    }
+
+    @GetMapping("/{id}/history")
+    @Operation(summary = "Get portfolio value history", description = "Returns daily portfolio value in INR and USD for chart display")
+    public ResponseEntity<PortfolioHistoryDTO> getPortfolioHistory(
+            @Parameter(description = "Portfolio ID")
+            @PathVariable String id,
+            @Parameter(description = "User ID from header")
+            @RequestHeader("X-User-Id") String userId,
+            @Parameter(description = "Number of days of history")
+            @RequestParam(defaultValue = "30") int days) {
+        log.debug("Get portfolio history: {} for user: {}, days={}", id, userId, days);
+        PortfolioHistoryDTO history = portfolioService.getPortfolioHistory(id, userId, days);
+        return ResponseEntity.ok(history);
     }
 
     @GetMapping("/{id}/holdings")

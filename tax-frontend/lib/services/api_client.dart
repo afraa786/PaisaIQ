@@ -83,9 +83,13 @@ class ApiClient {
     ));
   }
 
-  Future<T> get<T>(String path, {Map<String, dynamic>? queryParameters}) async {
+  Future<T> get<T>(String path,
+      {Map<String, dynamic>? queryParameters,
+      Map<String, dynamic>? headers}) async {
     try {
-      final response = await _dio.get<T>(path, queryParameters: queryParameters);
+      final response = await _dio.get<T>(path,
+          queryParameters: queryParameters,
+          options: headers != null ? Options(headers: headers) : null);
       return response.data as T;
     } on DioException catch (error) {
       throw ApiException(error.error?.toString() ?? 'Unknown network error');
@@ -94,9 +98,13 @@ class ApiClient {
     }
   }
 
-  Future<T> post<T>(String path, {Map<String, dynamic>? data}) async {
+  Future<T> post<T>(String path,
+      {Map<String, dynamic>? data,
+      Map<String, dynamic>? headers}) async {
     try {
-      final response = await _dio.post<T>(path, data: data);
+      final response = await _dio.post<T>(path,
+          data: data,
+          options: headers != null ? Options(headers: headers) : null);
       return response.data as T;
     } on DioException catch (error) {
       throw ApiException(error.error?.toString() ?? 'Unknown network error');
@@ -105,9 +113,10 @@ class ApiClient {
     }
   }
 
-  Future<T> delete<T>(String path) async {
+  Future<T> delete<T>(String path, {Map<String, dynamic>? headers}) async {
     try {
-      final response = await _dio.delete<T>(path);
+      final response = await _dio.delete<T>(path,
+          options: headers != null ? Options(headers: headers) : null);
       return response.data as T;
     } on DioException catch (error) {
       throw ApiException(error.error?.toString() ?? 'Unknown network error');
