@@ -1,4 +1,5 @@
 import 'package:alpharedge_flutter/data/models/portfolio_model.dart';
+import 'package:alpharedge_flutter/data/models/portfolio_summary_model.dart';
 import 'package:alpharedge_flutter/services/api_client.dart';
 
 const _defaultUserId = 'user-1';
@@ -48,6 +49,14 @@ class PortfolioRepository {
       headers: {'X-User-Id': _defaultUserId},
     );
     return PortfolioModel.fromJson(data);
+  }
+
+  Future<PortfolioSummaryModel> fetchPortfolioSummary(String portfolioId) async {
+    final data = await apiClient.get<Map<String, dynamic>>(
+      '/portfolios/$portfolioId/summary',
+      headers: {'X-User-Id': _defaultUserId},
+    );
+    return PortfolioSummaryModel.fromJson(data);
   }
 
   Future<PortfolioModel> removeHolding({
