@@ -8,7 +8,7 @@ class MarketRepository {
   MarketRepository(this.apiClient);
 
   Future<MarketGlobalModel> fetchGlobalMarket() async {
-    final data = await apiClient.get<Map<String, dynamic>>('/market/global');
+    final data = await apiClient.get<Map<String, dynamic>>('/market/summary');
     return MarketGlobalModel.fromJson(data);
   }
 

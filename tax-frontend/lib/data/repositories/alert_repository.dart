@@ -1,13 +1,16 @@
 import 'package:alpharedge_flutter/data/models/alert_model.dart';
 import 'package:alpharedge_flutter/services/api_client.dart';
 
+const _defaultUserId = 'user-1';
+const _userHeader = {'X-User-Id': _defaultUserId};
+
 class AlertRepository {
   final ApiClient apiClient;
 
   AlertRepository(this.apiClient);
 
   Future<List<AlertModel>> fetchAlerts() async {
-    final data = await apiClient.get<List<dynamic>>('/alerts');
+    final data = await apiClient.get<List<dynamic>>('/alerts', headers: _userHeader);
     return data.map((item) => AlertModel.fromJson(item as Map<String, dynamic>)).toList();
   }
 
@@ -22,11 +25,11 @@ class AlertRepository {
       'targetPrice': targetPrice,
       'condition': condition,
       'email': email,
-    });
+    }, headers: _userHeader);
     return AlertModel.fromJson(data);
   }
 
   Future<void> deleteAlert(String alertId) async {
-    await apiClient.delete<void>('/alerts/$alertId');
+    await apiClient.delete<void>('/alerts/$alertId', headers: _userHeader);
   }
 }
