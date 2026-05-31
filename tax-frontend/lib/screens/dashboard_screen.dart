@@ -6,9 +6,9 @@ import '../data/providers/coin_providers.dart';
 import '../data/providers/market_providers.dart';
 import '../data/repositories/coin_repository.dart';
 import '../utils/formatters.dart';
-import '../widgets/coin_list_tile.dart';
+import '../utils/theme.dart';
+import '../widgets/candlestick_chart.dart';
 import '../widgets/loading_shimmer.dart';
-import '../widgets/price_change_chip.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -19,6 +19,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   final _coinController = TextEditingController();
+  String? _chartCoinId;
 
   @override
   void dispose() {
@@ -27,130 +28,203 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Future<void> _trackCoin(BuildContext context) async {
-    final coinId = _coinController.text.trim();
+    final coinId = _coinController.text.trim().toLowerCase();
     if (coinId.isEmpty) return;
     try {
       await ref.read(coinRepositoryProvider).trackCoin(coinId);
       _coinController.clear();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Coin tracking started.')));
-      }
-      ref.refresh(trackedCoinsProvider);
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
+      if (context.mounted) Navigator.of(context).pop();
+      ref.invalidate(trackedCoinsProvider);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final marketValue = ref.watch(marketGlobalProvider);
-    final trendingValue = ref.watch(trendingCoinsProvider);
-    final watchlistValue = ref.watch(trackedCoinsProvider);
+    final market   = ref.watch(marketGlobalProvider);
+    final trending = ref.watch(trendingCoinsProvider);
+    final watchlist = ref.watch(trackedCoinsProvider);
+
+    // Default chart coin = first tracked coin
+    final chartId = _chartCoinId ??
+        watchlist.whenOrNull(data: (c) => c.isNotEmpty ? c.first.coinId : null);
+    final ohlc = chartId != null
+        ? ref.watch(ohlcProvider('$chartId|30'))
+        : null;
 
     return Scaffold(
+      backgroundColor: kBg,
       appBar: AppBar(
-        title: const Text('AlphaEdge'),
+        title: const Text('ALPHAEDGE'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.add, color: kWhite),
+            onPressed: () => _showTrackSheet(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, color: kGray1, size: 20),
             onPressed: () => context.goNamed('settings'),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          showModalBottomSheet(
-            context: context,
-            backgroundColor: const Color(0xFF161B22),
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            builder: (context) {
-              return Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text('Track Coin', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: _coinController,
-                      decoration: const InputDecoration(
-                        hintText: 'Enter coin ID',
-                        border: OutlineInputBorder(),
-                      ),
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => _trackCoin(context),
-                    ),
-                    const SizedBox(height: 14),
-                    ElevatedButton(
-                      onPressed: () => _trackCoin(context),
-                      child: const Text('Start Tracking'),
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
-        },
-        child: const Icon(Icons.add),
-      ),
       body: RefreshIndicator(
+        color: kWhite,
+        backgroundColor: kCard,
         onRefresh: () async {
-          ref.refresh(marketGlobalProvider);
-          ref.refresh(trendingCoinsProvider);
-          ref.refresh(trackedCoinsProvider);
+          ref.invalidate(marketGlobalProvider);
+          ref.invalidate(trendingCoinsProvider);
+          ref.invalidate(trackedCoinsProvider);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 8),
-              marketValue.when(
-                data: (market) => _buildMarketBanner(market),
-                loading: () => const LoadingShimmer(itemCount: 1),
-                error: (error, stack) => _buildErrorCard(error.toString(), () => ref.refresh(marketGlobalProvider)),
+              // ── Market ticker bar ──────────────────────────────────────────
+              market.when(
+                data: (m) => _MarketTicker(market: m),
+                loading: () => const SizedBox(height: 36, child: LoadingShimmer(itemCount: 1)),
+                error: (e, _) => const SizedBox.shrink(),
               ),
-              const SizedBox(height: 20),
-              const Text('Trending', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 12),
-              trendingValue.when(
-                data: (trending) => _buildTrendingRow(trending),
-                loading: () => const SizedBox(height: 120, child: LoadingShimmer(itemCount: 1)),
-                error: (error, stack) => _buildErrorCard(error.toString(), () => ref.refresh(trendingCoinsProvider)),
-              ),
-              const SizedBox(height: 24),
-              const Text('Watchlist', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 12),
-              watchlistValue.when(
-                data: (coins) {
-                  if (coins.isEmpty) {
-                    return _buildEmptyState('No tracked coins yet. Use + to track a coin.');
-                  }
-                  return Column(
-                    children: coins.map((coin) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: CoinListTile(
-                          name: coin.name,
-                          symbol: coin.symbol,
-                          priceUsd: coin.priceSnapshot.priceUsd,
-                          priceInr: coin.priceSnapshot.priceInr,
-                          change24h: coin.priceSnapshot.priceChange24hPercent,
-                          onTap: () => context.go('/coin/${coin.coinId}'),
+
+              // ── Main candlestick chart ─────────────────────────────────────
+              if (chartId != null) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Row(
+                    children: [
+                      Text(chartId.toUpperCase(),
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.5,
+                              color: kWhite)),
+                      const SizedBox(width: 8),
+                      const Text('/ USD  30D',
+                          style: TextStyle(fontSize: 11, color: kGray2)),
+                      const Spacer(),
+                      // Coin selector chips
+                      watchlist.whenOrNull(
+                        data: (coins) => coins.length > 1
+                            ? SizedBox(
+                                height: 24,
+                                child: ListView(
+                                  shrinkWrap: true,
+                                  scrollDirection: Axis.horizontal,
+                                  children: coins
+                                      .take(4)
+                                      .map((c) => GestureDetector(
+                                            onTap: () => setState(
+                                                () => _chartCoinId = c.coinId),
+                                            child: Container(
+                                              margin: const EdgeInsets.only(left: 6),
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: _chartCoinId == c.coinId ||
+                                                        (chartId == c.coinId)
+                                                    ? kWhite
+                                                    : kSurface,
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(color: kBorder),
+                                              ),
+                                              child: Text(
+                                                c.symbol.toUpperCase(),
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: _chartCoinId == c.coinId ||
+                                                          (chartId == c.coinId)
+                                                      ? kBg
+                                                      : kGray1,
+                                                ),
+                                              ),
+                                            ),
+                                          ))
+                                      .toList(),
+                                ),
+                              )
+                            : null,
+                      ) ?? const SizedBox.shrink(),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: ohlc == null
+                      ? const SizedBox(height: 240, child: LoadingShimmer(itemCount: 1))
+                      : ohlc.when(
+                          loading: () => const SizedBox(
+                              height: 240, child: LoadingShimmer(itemCount: 1)),
+                          error: (e, _) => SizedBox(
+                              height: 80,
+                              child: Center(
+                                  child: Text('Chart unavailable',
+                                      style: TextStyle(color: kGray2, fontSize: 12)))),
+                          data: (candles) => CandlestickChart(
+                              candles: candles, height: 240),
                         ),
-                      );
-                    }).toList(),
-                  );
-                },
-                loading: () => const LoadingShimmer(),
-                error: (error, stack) => _buildErrorCard(error.toString(), () => ref.refresh(trackedCoinsProvider)),
+                ),
+              ],
+
+              const SizedBox(height: 20),
+
+              // ── Trending ───────────────────────────────────────────────────
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text('TRENDING',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 2,
+                        color: kGray1)),
               ),
+              const SizedBox(height: 10),
+              trending.when(
+                data: (list) => _TrendingRow(coins: list),
+                loading: () => const SizedBox(
+                    height: 80, child: LoadingShimmer(itemCount: 1)),
+                error: (e, _) => const SizedBox.shrink(),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ── Watchlist ──────────────────────────────────────────────────
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text('WATCHLIST',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 2,
+                        color: kGray1)),
+              ),
+              const SizedBox(height: 10),
+              watchlist.when(
+                data: (coins) => coins.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text('Tap + to track a coin.',
+                            style: TextStyle(color: kGray2, fontSize: 13)))
+                    : Column(
+                        children: coins
+                            .map((coin) => _WatchlistTile(
+                                  coin: coin,
+                                  onTap: () => context.go('/coin/${coin.coinId}'),
+                                ))
+                            .toList(),
+                      ),
+                loading: () => const LoadingShimmer(),
+                error: (e, _) => Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(e.toString(),
+                        style: const TextStyle(color: kRed, fontSize: 12))),
+              ),
+              const SizedBox(height: 100),
             ],
           ),
         ),
@@ -158,68 +232,112 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildMarketBanner(dynamic market) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
-        borderRadius: BorderRadius.circular(20),
+  void _showTrackSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: kCard,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('TRACK COIN',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 2)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _coinController,
+              autofocus: true,
+              decoration: const InputDecoration(
+                  hintText: 'bitcoin, ethereum, solana...',
+                  hintStyle: TextStyle(color: kGray2)),
+              onSubmitted: (_) => _trackCoin(context),
+            ),
+            const SizedBox(height: 14),
+            ElevatedButton(
+                onPressed: () => _trackCoin(context),
+                child: const Text('TRACK')),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+// ── Market ticker ─────────────────────────────────────────────────────────────
+
+class _MarketTicker extends StatelessWidget {
+  const _MarketTicker({required this.market});
+  final dynamic market;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: kSurface,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _buildStat('Market Cap', formatCompact(market.totalMarketCapUsd)),
-          _buildStat('24h Volume', formatCompact(market.volume24hUsd)),
-          _buildStat('BTC Dominance', '${market.btcDominance.toStringAsFixed(1)}%'),
+          _item('MCAP', formatCompact(market.totalMarketCapUsd)),
+          _item('VOL 24H', formatCompact(market.volume24hUsd)),
+          _item('BTC DOM', '${market.btcDominance.toStringAsFixed(1)}%'),
         ],
       ),
     );
   }
 
-  Widget _buildStat(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: Colors.white60, fontSize: 12)),
-        const SizedBox(height: 6),
-        Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-      ],
-    );
-  }
+  Widget _item(String label, String value) => Row(children: [
+        Text('$label ', style: const TextStyle(color: kGray2, fontSize: 11)),
+        Text(value,
+            style: const TextStyle(
+                color: kWhite, fontSize: 11, fontWeight: FontWeight.w700)),
+      ]);
+}
 
-  Widget _buildTrendingRow(List<dynamic> trending) {
+// ── Trending row ──────────────────────────────────────────────────────────────
+
+class _TrendingRow extends StatelessWidget {
+  const _TrendingRow({required this.coins});
+  final List<dynamic> coins;
+
+  @override
+  Widget build(BuildContext context) {
     return SizedBox(
-      height: 120,
+      height: 72,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: trending.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final item = trending[index];
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: coins.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final c = coins[i];
           return GestureDetector(
-            onTap: () => context.go('/coin/${item.coinId}'),
+            onTap: () => context.go('/coin/${c.coinId}'),
             child: Container(
-              width: 180,
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFF161B22),
-                borderRadius: BorderRadius.circular(18),
-              ),
+                  color: kCard,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: kBorder)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(item.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 6),
-                  Text(item.symbol.toUpperCase(), style: const TextStyle(color: Colors.white60)),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0A1F17),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Text('\$${item.priceUsd.toStringAsFixed(item.priceUsd < 1 ? 6 : 2)}',
-                        style: const TextStyle(color: Color(0xFF00C896), fontWeight: FontWeight.w600)),
+                  Text(c.symbol.toUpperCase(),
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: kWhite)),
+                  const SizedBox(height: 3),
+                  Text(
+                    '\$${c.priceUsd < 1 ? c.priceUsd.toStringAsFixed(6) : c.priceUsd.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 11, color: kGray1),
                   ),
                 ],
               ),
@@ -229,35 +347,85 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ),
     );
   }
+}
 
-  Widget _buildErrorCard(String message, VoidCallback retry) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Error', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-          const SizedBox(height: 8),
-          Text(message, style: const TextStyle(color: Colors.white70)),
-          const SizedBox(height: 12),
-          ElevatedButton(onPressed: retry, child: const Text('Retry')),
-        ],
-      ),
-    );
-  }
+// ── Watchlist tile ────────────────────────────────────────────────────────────
 
-  Widget _buildEmptyState(String message) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
-        borderRadius: BorderRadius.circular(16),
+class _WatchlistTile extends StatelessWidget {
+  const _WatchlistTile({required this.coin, required this.onTap});
+  final dynamic coin;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final snap = coin.priceSnapshot;
+    final change = (snap?.priceChange24hPercent ?? 0.0) as double;
+    final isUp = change >= 0;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+            color: kCard,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: kBorder)),
+        child: Row(
+          children: [
+            // Symbol box
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                  border: Border.all(color: kBorder),
+                  borderRadius: BorderRadius.circular(4)),
+              child: Text(
+                (coin.symbol as String).substring(0, (coin.symbol as String).length.clamp(0, 3)).toUpperCase(),
+                style: const TextStyle(
+                    fontSize: 10, fontWeight: FontWeight.w700, color: kWhite),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Name
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(coin.name as String,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700)),
+                  Text(coin.symbol.toUpperCase() as String,
+                      style:
+                          const TextStyle(fontSize: 11, color: kGray2)),
+                ],
+              ),
+            ),
+            // Price + change
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  snap != null
+                      ? '\$${(snap.priceUsd as double) < 1 ? (snap.priceUsd as double).toStringAsFixed(6) : (snap.priceUsd as double).toStringAsFixed(2)}'
+                      : '—',
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${isUp ? '+' : ''}${change.toStringAsFixed(2)}%',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: isUp ? kGreen : kRed,
+                      fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-      child: Text(message, style: const TextStyle(color: Colors.white60)),
     );
   }
 }

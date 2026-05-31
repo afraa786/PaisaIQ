@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/compare_model.dart';
 import '../models/coin_model.dart';
 import '../models/coin_signal_model.dart';
+import '../models/ohlc_model.dart';
 import '../repositories/coin_repository.dart';
 import '../../services/api_client.dart';
 
@@ -33,4 +34,13 @@ final coinHistoryProvider = FutureProvider.family.autoDispose<List<Map<String, d
 
 final compareCoinsProvider = FutureProvider.autoDispose.family<List<CompareModel>, String>(
   (ref, joinedIds) => ref.watch(coinRepositoryProvider).compareCoins(joinedIds.split(',')),
+);
+
+final ohlcProvider = FutureProvider.autoDispose.family<List<OhlcModel>, String>(
+  (ref, key) {
+    final parts = key.split('|');
+    final coinId = parts.first;
+    final days = int.tryParse(parts.elementAtOrNull(1) ?? '') ?? 30;
+    return ref.watch(coinRepositoryProvider).fetchOhlc(coinId, days: days);
+  },
 );

@@ -2,6 +2,7 @@ import 'package:alpharedge_flutter/data/models/compare_model.dart';
 import 'package:alpharedge_flutter/data/models/coin_model.dart';
 import 'package:alpharedge_flutter/data/models/coin_price_model.dart';
 import 'package:alpharedge_flutter/data/models/coin_signal_model.dart';
+import 'package:alpharedge_flutter/data/models/ohlc_model.dart';
 import 'package:alpharedge_flutter/services/api_client.dart';
 
 class CoinRepository {
@@ -37,6 +38,16 @@ class CoinRepository {
   Future<List<CompareModel>> compareCoins(List<String> ids) async {
     final response = await apiClient.get<List<dynamic>>('/coins/compare', queryParameters: {'ids': ids.join(',')});
     return response.map((item) => CompareModel.fromJson(item as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<OhlcModel>> fetchOhlc(String coinId, {int days = 30}) async {
+    final data = await apiClient.get<List<dynamic>>(
+      '/coins/$coinId/ohlc',
+      queryParameters: {'days': days},
+    );
+    return data
+        .map((e) => OhlcModel.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<CoinModel> trackCoin(String coinId) async {

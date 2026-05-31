@@ -10,6 +10,7 @@ import com.alpharedge.dto.response.CoinDetailDTO;
 import com.alpharedge.dto.response.CoinPriceDTO;
 import com.alpharedge.dto.response.CoinSignalDTO;
 import com.alpharedge.dto.response.CompareDTO;
+import com.alpharedge.dto.response.OhlcDTO;
 import com.alpharedge.dto.response.PriceSnapshotDTO;
 import com.alpharedge.dto.response.TrackedCoinDTO;
 import com.alpharedge.engine.TechnicalAnalysisService;
@@ -249,6 +250,23 @@ public class CoinService {
         } catch (Exception ex) {
             log.error("Error comparing coins", ex);
             return new ArrayList<>();
+        }
+    }
+
+    public List<OhlcDTO> getOhlc(String coinId, int days) {
+        try {
+            trackedCoinRepository.findByCoinId(coinId)
+                    .orElseThrow(() -> new CoinNotFoundException("Coin not found: " + coinId));
+            List<List<Double>> raw = coinGeckoClient.fetchOhlc(coinId, days);
+            return raw.stream()
+                    .filter(c -> c != null && c.size() >= 5)
+                    .map(c -> new OhlcDTO(
+                            c.get(0).longValue(),
+                            c.get(1), c.get(2), c.get(3), c.get(4)))
+                    .collect(Collectors.toList());
+        } catch (Exception ex) {
+            log.error("Error fetching OHLC for: {}", coinId, ex);
+            throw ex;
         }
     }
 

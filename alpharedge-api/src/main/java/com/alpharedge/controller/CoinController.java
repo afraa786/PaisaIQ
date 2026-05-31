@@ -4,6 +4,7 @@ import com.alpharedge.dto.response.CoinDetailDTO;
 import com.alpharedge.dto.response.CoinPriceDTO;
 import com.alpharedge.dto.response.CoinSignalDTO;
 import com.alpharedge.dto.response.CompareDTO;
+import com.alpharedge.dto.response.OhlcDTO;
 import com.alpharedge.dto.response.PriceSnapshotDTO;
 import com.alpharedge.dto.response.TrackedCoinDTO;
 import com.alpharedge.service.CoinService;
@@ -129,6 +130,15 @@ public class CoinController {
         log.debug("Get coin price request: {}", coinId);
         CoinPriceDTO price = coinService.getCoinPrice(coinId);
         return ResponseEntity.ok(price);
+    }
+
+    @GetMapping("/{coinId}/ohlc")
+    @Operation(summary = "Get OHLC candlestick data", description = "Returns daily OHLC candles for charting. Each candle: [timestamp, open, high, low, close].")
+    public ResponseEntity<List<OhlcDTO>> getOhlc(
+            @Parameter(description = "CoinGecko coin ID") @PathVariable String coinId,
+            @Parameter(description = "Number of days") @RequestParam(defaultValue = "30") int days) {
+        log.debug("Get OHLC request: coinId={}, days={}", coinId, days);
+        return ResponseEntity.ok(coinService.getOhlc(coinId, days));
     }
 
     @GetMapping("/compare")

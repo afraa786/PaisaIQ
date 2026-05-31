@@ -1,10 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'screens/alerts_screen.dart';
 import 'screens/compare_screen.dart';
 import 'screens/coin_detail_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/learn_screen.dart';
 import 'screens/portfolio_screen.dart';
 import 'screens/settings_screen.dart';
 import 'utils/theme.dart';
@@ -22,44 +23,21 @@ class AlphaEdgeApp extends ConsumerWidget {
       initialLocation: '/',
       routes: [
         ShellRoute(
-          builder: (context, state, child) {
-            return AppShell(child: child);
-          },
+          builder: (context, state, child) => AppShell(child: child),
           routes: [
-            GoRoute(
-              path: '/',
-              name: 'dashboard',
-              builder: (context, state) => const DashboardScreen(),
-            ),
-            GoRoute(
-              path: '/compare',
-              name: 'compare',
-              builder: (context, state) => const CompareScreen(),
-            ),
-            GoRoute(
-              path: '/alerts',
-              name: 'alerts',
-              builder: (context, state) => const AlertsScreen(),
-            ),
-            GoRoute(
-              path: '/portfolio',
-              name: 'portfolio',
-              builder: (context, state) => const PortfolioScreen(),
-            ),
-            GoRoute(
-              path: '/settings',
-              name: 'settings',
-              builder: (context, state) => const SettingsScreen(),
-            ),
+            GoRoute(path: '/',         name: 'dashboard', builder: (_, __) => const DashboardScreen()),
+            GoRoute(path: '/learn',    name: 'learn',     builder: (_, __) => const LearnScreen()),
+            GoRoute(path: '/alerts',   name: 'alerts',    builder: (_, __) => const AlertsScreen()),
+            GoRoute(path: '/portfolio',name: 'portfolio', builder: (_, __) => const PortfolioScreen()),
+            GoRoute(path: '/compare',  name: 'compare',   builder: (_, __) => const CompareScreen()),
+            GoRoute(path: '/settings', name: 'settings',  builder: (_, __) => const SettingsScreen()),
           ],
         ),
         GoRoute(
           path: '/coin/:coinId',
           name: 'coinDetail',
-          builder: (context, state) {
-            final coinId = state.pathParameters['coinId'] ?? '';
-            return CoinDetailScreen(coinId: coinId);
-          },
+          builder: (context, state) =>
+              CoinDetailScreen(coinId: state.pathParameters['coinId'] ?? ''),
         ),
       ],
     );
@@ -79,38 +57,54 @@ class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.child});
   final Widget child;
 
-  static const tabRoutes = ['dashboard', 'compare', 'alerts', 'portfolio'];
+  static const _tabs = [
+    ('dashboard', '/'),
+    ('learn',     '/learn'),
+    ('alerts',    '/alerts'),
+    ('portfolio', '/portfolio'),
+  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).uri.toString();
-    final currentIndex = _routeIndex(location);
+    final currentIndex = _indexFor(location);
+
     return Scaffold(
       body: child,
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: currentIndex,
-        backgroundColor: const Color(0xFF161B22),
-        selectedItemColor: const Color(0xFF00C896),
-        unselectedItemColor: Colors.white54,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.compare_arrows), label: 'Compare'),
-          BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Alerts'),
-          BottomNavigationBarItem(icon: Icon(Icons.pie_chart), label: 'Portfolio'),
-        ],
-        onTap: (index) {
-          final routeName = tabRoutes[index];
-          context.goNamed(routeName);
-        },
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: kBorder)),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: currentIndex,
+          onTap: (i) => context.goNamed(_tabs[i].$1),
+          items: const [
+            BottomNavigationBarItem(
+                icon: Icon(Icons.candlestick_chart_outlined),
+                activeIcon: Icon(Icons.candlestick_chart),
+                label: 'Markets'),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.play_circle_outline),
+                activeIcon: Icon(Icons.play_circle),
+                label: 'Learn'),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.notifications_outlined),
+                activeIcon: Icon(Icons.notifications),
+                label: 'Alerts'),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.account_balance_wallet_outlined),
+                activeIcon: Icon(Icons.account_balance_wallet),
+                label: 'Portfolio'),
+          ],
+        ),
       ),
     );
   }
 
-  int _routeIndex(String location) {
-    if (location.startsWith('/compare')) return 1;
-    if (location.startsWith('/alerts')) return 2;
-    if (location.startsWith('/portfolio')) return 3;
+  int _indexFor(String loc) {
+    if (loc.startsWith('/learn'))     return 1;
+    if (loc.startsWith('/alerts'))    return 2;
+    if (loc.startsWith('/portfolio')) return 3;
     return 0;
   }
 }

@@ -113,6 +113,29 @@ public class CoinGeckoClient {
         }
     }
 
+    /**
+     * Returns OHLC candles: each element is [timestamp, open, high, low, close].
+     * CoinGecko returns 1 candle per day for days <= 90.
+     */
+    @Retryable(retryFor = Exception.class, maxAttempts = 3, backoff = @Backoff(delay = 2000))
+    public List<List<Double>> fetchOhlc(String coinId, int days) {
+        try {
+            log.debug("Fetching OHLC for: {} days={}", coinId, days);
+            @SuppressWarnings("unchecked")
+            List<List<Double>> response = webClient.get()
+                    .uri("/coins/{coinId}/ohlc?vs_currency=usd&days={days}", coinId, days)
+                    .retrieve()
+                    .bodyToMono((Class<List<List<Double>>>) (Class<?>) List.class)
+                    .block();
+            return response != null ? response : new ArrayList<>();
+        } catch (WebClientResponseException ex) {
+            if (ex.getStatusCode().value() == 429) throw new RateLimitException("CoinGecko rate limit");
+            throw new CoinGeckoApiException("Failed to fetch OHLC: " + ex.getMessage(), ex);
+        } catch (Exception ex) {
+            throw new CoinGeckoApiException("Failed to fetch OHLC: " + ex.getMessage(), ex);
+        }
+    }
+
     @Retryable(retryFor = Exception.class, maxAttempts = 3, backoff = @Backoff(delay = 2000))
     public List<CoinGeckoMarketResponse> fetchTopCoins(int limit) {
         try {
